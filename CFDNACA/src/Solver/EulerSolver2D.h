@@ -18,12 +18,13 @@ public:
     std::vector<FaceNormal> FarfieldNormals;
 
     EulerSolver2D(int num_cells_x, int num_cells_y, int order, double cfl);
+    virtual ~EulerSolver2D() = default;
 
     void initialize(double rho_inf, double u_inf, double v_inf, double p_inf);
-    double computeTimeStep();
+    virtual double computeTimeStep();
 
     // Evaluates spatial fluxes based on a given state and outputs to a residual array
-    void computeFluxResidual(const Field2D<StateVec>& state_in, Field2D<StateVec>& residualOut) const;
+    virtual void computeFluxResidual(const Field2D<StateVec>& state_in, Field2D<StateVec>& residualOut) const;
 
 private:
     double minmod(double a, double b) const;
