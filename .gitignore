@@ -1,0 +1,33 @@
+# Visual Studio specific files and directories
+.vs/
+*.user
+*.suo
+*.db
+*.opendb
+*.VC.db
+
+# Build directories and outputs
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+bld/
+[Oo]bj/
+
+# Compiled object files, binaries, and logs
+*.obj
+*.exe
+*.pdb
+*.idb
+*.ilk
+*.tlog
+*.log
+*.recipe
+*.lastbuildstate
+
+# Project specific outputs (CFD results)
+CFDNACA/output/
+
+# Optional: Ignore meshes if they are too large for Git (remove if you want to keep them)
+# CFDNACA/data/*.plt
