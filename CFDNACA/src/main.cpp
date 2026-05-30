@@ -9,6 +9,7 @@
 #include "IO/MeshLoader.h"
 #include "IO/TecplotWriter.h"
 #include "Solver/EulerSolver2D.h"
+#include "Solver/NavierStokesSolver2D.h"
 #include "TimeIntegration/RungeKutta3.h"
 
 #ifndef M_PI
@@ -32,16 +33,25 @@ int main() {
     // ---------------------------------------------------------
     // 2. Initialize Solver & Time Integrator
     // ---------------------------------------------------------
-    int spatialOrder = 2;
-    double maxCFL = 0.5;
-    EulerSolver2D solver(nx, ny, spatialOrder, maxCFL);
-    RungeKutta3 rk3(nx, ny);
 
     Field2D<Point2D> nodes(Nx, Ny);
     try {
+        // Read the nodes BEFORE passing them to the N-S solver
+        nodes = TecplotWriter::readNodes(meshFile, Nx, Ny);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Failed to read nodes: " << e.what() << "\n";
+        return 1;
+    }
+
+    EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL);
+    //NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
+    RungeKutta3 rk3(nx, ny);
+
+   
+    try {
         MeshLoader::loadMesh(meshFile, Nx, Ny, solver.Volumes, solver.NormalsXi,
             solver.NormalsEta, solver.WallNormals, solver.FarfieldNormals);
-        nodes = TecplotWriter::readNodes(meshFile, Nx, Ny);
     }
     catch (const std::exception& e) {
         std::cerr << "Initialization failed: " << e.what() << "\n";
@@ -51,12 +61,7 @@ int main() {
     // ---------------------------------------------------------
     // 3. Define Free-stream Conditions (NACA0012 Transonic)
     // ---------------------------------------------------------
-    //double Mach_inf = 0.8;
-    //double alpha_deg = 1.25;
-    //double alpha_rad = alpha_deg * M_PI / 180.0;
 
-    //double rho_inf = 1.0;
-    //double p_inf = 1.0;
     double a_inf = std::sqrt(Config::GAMMA * Config::p_inf / Config::rho_inf);
     double V_inf = Config::Mach_inf * a_inf;
 

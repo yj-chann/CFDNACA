@@ -36,6 +36,6 @@ namespace Config {
     // ---------------------------------------------------------
     // Solver Control Parameters
     // ---------------------------------------------------------
-    constexpr double MAX_CFL = 0.8;
-    constexpr int SPATIAL_ORDER = 2;
+    constexpr double maxCFL = 0.8;
+    constexpr int spatialOrder = 2;
 }

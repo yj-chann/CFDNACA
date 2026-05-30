@@ -128,16 +128,21 @@
     <ClCompile Include="src\IO\TecplotWriter.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Numerics\RoeFlux.cpp" />
+    <ClCompile Include="src\Numerics\ViscousFlux.cpp" />
     <ClCompile Include="src\Solver\EulerSolver2D.cpp" />
+    <ClCompile Include="src\Solver\NavierStokesSolver2D.cpp" />
     <ClCompile Include="src\TimeIntegration\RungeKutta3.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Boundaries\Boundary.h" />
+    <ClInclude Include="src\Core\config.h" />
     <ClInclude Include="src\Core\Type.h" />
     <ClInclude Include="src\IO\MeshLoader.h" />
     <ClInclude Include="src\IO\TecplotWriter.h" />
     <ClInclude Include="src\Numerics\RoeFlux.h" />
+    <ClInclude Include="src\Numerics\ViscousFlux.h" />
     <ClInclude Include="src\Solver\EulerSolver2D.h" />
+    <ClInclude Include="src\Solver\NavierStokesSolver2D.h" />
     <ClInclude Include="src\TimeIntegration\RungeKutta3.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
