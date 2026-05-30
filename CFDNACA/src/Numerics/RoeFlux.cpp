@@ -30,7 +30,7 @@ StateVec RoeFlux::computeFlux(const StateVec& UL, const StateVec& UR, const Face
     double u_tilde = (uL + Rv * uR) / (1.0 + Rv);
     double v_tilde = (vL + Rv * vR) / (1.0 + Rv);
     double H_tilde = (HL + Rv * HR) / (1.0 + Rv);
-    double a_tilde = std::sqrt(GAMMA_MINUS_ONE * (H_tilde - 0.5 * (u_tilde * u_tilde + v_tilde * v_tilde)));
+    double a_tilde = std::sqrt(Config::GAMMA_MINUS_ONE * (H_tilde - 0.5 * (u_tilde * u_tilde + v_tilde * v_tilde)));
 
     double u_breve = u_tilde * nx + v_tilde * ny;
     double lambda1 = u_breve;
@@ -60,7 +60,7 @@ StateVec RoeFlux::computeFlux(const StateVec& UL, const StateVec& UR, const Face
     dissipation.rhou = u_tilde * beta4 + nx * beta5 - ny * beta7;
     dissipation.rhov = v_tilde * beta4 + ny * beta5 + nx * beta7;
     dissipation.rhoE = H_tilde * beta4 + (u_tilde * nx + v_tilde * ny) * beta5
-        + (v_tilde * nx - u_tilde * ny) * beta7 - (a_tilde2 * beta1) / GAMMA_MINUS_ONE;
+        + (v_tilde * nx - u_tilde * ny) * beta7 - (a_tilde2 * beta1) / Config::GAMMA_MINUS_ONE;
 
     StateVec FL = physicalFlux(UL, nx, ny);
     StateVec FR = physicalFlux(UR, nx, ny);

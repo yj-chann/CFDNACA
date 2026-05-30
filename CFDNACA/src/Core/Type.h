@@ -1,11 +1,13 @@
 #pragma once
-
 #include <cmath>
 #include <vector>
+#include"config.h"
+
+
 
 // Physical constants
-constexpr double GAMMA = 1.4;
-constexpr double GAMMA_MINUS_ONE = GAMMA - 1.0;
+//constexpr double GAMMA = 1.4;
+//constexpr double GAMMA_MINUS_ONE = GAMMA - 1.0;
 
 // State vector: [rho, rho*u, rho*v, rho*E]
 struct StateVec {
@@ -17,9 +19,10 @@ struct StateVec {
     // Primitive variables extraction
     double u() const { return rhou / rho; }
     double v() const { return rhov / rho; }
-    double p() const { return GAMMA_MINUS_ONE * (rhoE - 0.5 * rho * (u() * u() + v() * v())); }
+    double p() const { return Config::GAMMA_MINUS_ONE * (rhoE - 0.5 * rho * (u() * u() + v() * v())); }
     double H() const { return (rhoE + p()) / rho; }
-    double a() const { return std::sqrt(GAMMA * p() / rho); }
+    double a() const { return std::sqrt(Config::GAMMA * p() / rho); }
+    double T() const { return p() / (rho * Config::R); }
 
     // Operator overloads for vector math
     StateVec operator-(const StateVec& rhs) const {
@@ -35,6 +38,14 @@ struct StateVec {
 
 struct FaceNormal {
     double nx, ny, length;
+};
+
+
+// Struct to hold spatial gradients (dx, dy) for Green-Gauss
+struct Gradient2D {
+    double dx, dy;
+    Gradient2D() : dx(0.0), dy(0.0) {}
+    Gradient2D(double dx, double dy) : dx(dx), dy(dy) {}
 };
 
 // 2D Array wrapper for computational grid variables

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 
+#include "Core/config.h"
 #include "Core/Type.h"
 #include "IO/MeshLoader.h"
 #include "IO/TecplotWriter.h"
@@ -50,19 +51,19 @@ int main() {
     // ---------------------------------------------------------
     // 3. Define Free-stream Conditions (NACA0012 Transonic)
     // ---------------------------------------------------------
-    double Mach_inf = 0.8;
-    double alpha_deg = 1.25;
-    double alpha_rad = alpha_deg * M_PI / 180.0;
+    //double Mach_inf = 0.8;
+    //double alpha_deg = 1.25;
+    //double alpha_rad = alpha_deg * M_PI / 180.0;
 
-    double rho_inf = 1.0;
-    double p_inf = 1.0;
-    double a_inf = std::sqrt(GAMMA * p_inf / rho_inf);
-    double V_inf = Mach_inf * a_inf;
+    //double rho_inf = 1.0;
+    //double p_inf = 1.0;
+    double a_inf = std::sqrt(Config::GAMMA * Config::p_inf / Config::rho_inf);
+    double V_inf = Config::Mach_inf * a_inf;
 
-    double u_inf = V_inf * std::cos(alpha_rad);
-    double v_inf = V_inf * std::sin(alpha_rad);
+    double u_inf = V_inf * std::cos(Config::alpha_rad);
+    double v_inf = V_inf * std::sin(Config::alpha_rad);
 
-    solver.initialize(rho_inf, u_inf, v_inf, p_inf);
+    solver.initialize(Config::rho_inf, u_inf, v_inf, Config::p_inf);
     TecplotWriter::exportSolution(initialOut, Nx, Ny, nodes, solver.U);
 
     // ---------------------------------------------------------

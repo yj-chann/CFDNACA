@@ -10,7 +10,7 @@ EulerSolver2D::EulerSolver2D(int num_cells_x, int num_cells_y, int order, double
 }
 
 void EulerSolver2D::initialize(double rho_inf, double u_inf, double v_inf, double p_inf) {
-    double rhoE_inf = p_inf / GAMMA_MINUS_ONE + 0.5 * rho_inf * (u_inf * u_inf + v_inf * v_inf);
+    double rhoE_inf = p_inf / Config::GAMMA_MINUS_ONE + 0.5 * rho_inf * (u_inf * u_inf + v_inf * v_inf);
     U_inf = StateVec(rho_inf, rho_inf * u_inf, rho_inf * v_inf, rhoE_inf);
 
     for (int j = 0; j < ny; ++j) {
