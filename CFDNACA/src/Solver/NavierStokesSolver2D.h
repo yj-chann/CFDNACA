@@ -24,4 +24,6 @@ private:
     // Geometric and Interpolation Helpers
     Point2D getCellPos(int i, int j) const;
     StateVec interpolateToNode(const Field2D<StateVec>& U_in, int ni, int nj) const;
+    StateVec extrapolateToWall(const Field2D<StateVec>& state_in, int i) const override;
+   
 };

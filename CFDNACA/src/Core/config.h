@@ -26,6 +26,8 @@ namespace Config {
     constexpr double rho_inf = 1.225;
     constexpr double p_inf = 101325;
 
+    constexpr double Tw = 300.0;
+
     // ---------------------------------------------------------
     // Viscous & Reference Parameters
     // ---------------------------------------------------------

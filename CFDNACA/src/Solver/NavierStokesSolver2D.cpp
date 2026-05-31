@@ -1,5 +1,7 @@
 #include "NavierStokesSolver2D.h"
 #include "../Boundaries/Boundary.h"
+#include "../Numerics/RoeFlux.h"
+#include "../Numerics/ViscousFlux.h"
 #include <algorithm>
 #include <cmath>
 
@@ -23,6 +25,21 @@ double NavierStokesSolver2D::computeViscosity(double T) const {
     return mu;
 }
 
+// i + 1/2, 1/2
+StateVec NavierStokesSolver2D::extrapolateToWall(const Field2D<StateVec>& state_in, int i) const {
+    if (!spatialOrder) {
+        double p_node = state_in(i, 0).p();
+        // isothermal rho_node = p_node / (R * T_wall)
+        double rho_node = p_node / (Config::R * Config::Tw);
+        return StateVec(rho_node, 0.0, 0.0, p_node / Config::GAMMA_MINUS_ONE);
+    }
+    else{
+        double p_node = (state_in(i, 0).p() * 1.5 - state_in(i, 1).p() * 0.5);
+        double rho_node = p_node / (Config::R * Config::Tw);
+        return StateVec(rho_node, 0.0, 0.0, p_node / Config::GAMMA_MINUS_ONE);
+    }
+}
+
 
 
 
@@ -38,14 +55,18 @@ Point2D NavierStokesSolver2D::getCellPos(int i, int j) const {
     return Point2D(cx, cy);
 }
 
+
 // ni , nj are node indices (0 to nx for ni, 0 to ny for nj) - note that nodes are (nx+1) x (ny+1)
 StateVec NavierStokesSolver2D::interpolateToNode(const Field2D<StateVec>& U_in, int ni, int nj) const {
     // 1. Calculate horizontal weighting factor (alpha) - needed for both boundary and interior
     int ci_L = wrapXi(ni - 1);
     int ci_R = wrapXi(ni);
 
-    Point2D p_L = Nodes(ni - 1, nj);
-    Point2D p_R = Nodes(ni + 1, nj);
+ 
+    int ni_L = wrapXi(ni - 1);
+    int ni_R = wrapXi(ni + 1);
+    Point2D p_L = Nodes(ni_L, nj);
+    Point2D p_R = Nodes(ni_R, nj);
     Point2D p_node = Nodes(ni, nj);
 
     double d_L = std::hypot(p_L.x - p_node.x, p_L.y - p_node.y);
@@ -58,18 +79,25 @@ StateVec NavierStokesSolver2D::interpolateToNode(const Field2D<StateVec>& U_in, 
         double p_row0 = alpha * U_in(ci_L, 0).p() + (1.0 - alpha) * U_in(ci_R, 0).p();
         double p_row1 = alpha * U_in(ci_L, 1).p() + (1.0 - alpha) * U_in(ci_R, 1).p();
 
-        double rho_row0 = alpha * U_in(ci_L, 0).rho + (1.0 - alpha) * U_in(ci_R, 0).rho;
-        double rho_row1 = alpha * U_in(ci_L, 1).rho + (1.0 - alpha) * U_in(ci_R, 1).rho;
 
         // Apply Boundary Conditions
-        double p_node = 1.5 * p_row0 - 0.5 * p_row1; // Extrapolated pressure
+        if (!spatialOrder) {
+            
+            double p_node =  p_row0 ;
 
-        // Extrapolate density (If strictly isothermal, replace this with rho_node = p_node / (R * T_wall))
-        double rho_node = 1.5 * rho_row0 - 0.5 * rho_row1;
+            // isothermal rho_node = p_node / (R * T_wall)
+            double rho_node = p_node / (Config::R * Config::Tw);
 
-        // Reconstruct and return conservative StateVec   
-        double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
-        return StateVec(rho_node, 0.0, 0.0, rhoE_node);
+            // Reconstruct and return conservative StateVec   
+            double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
+            return StateVec(rho_node, 0.0, 0.0, rhoE_node);
+        }
+        else { 
+            double p_node = 1.5 * p_row0 - 0.5 * p_row1; // Extrapolated pressure       
+            double rho_node = p_node / (Config::R * Config::Tw);  
+            double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
+            return StateVec(rho_node, 0.0, 0.0, rhoE_node);
+        }
     }
 
     if (nj >= ny) return U_inf; // Simplistic Far-field mapping
@@ -159,38 +187,168 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
             residualOut(i, j) = StateVec();
         }
     }
-    
-
 
     // 1. Get pure inviscid residual along Xi direction (i+1/2 faces)
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            StateVec UL = reconstructXi(state_in, i, j, false);
+            StateVec UR = reconstructXi(state_in, i, j, true);
+            StateVec flux = RoeFlux::computeFlux(UL, UR, NormalsXi(i, j));
 
+            // Inviscid fluxes are subtracted from left cell, added to right cell
+            residualOut(i, j) = residualOut(i, j) - flux;
+            residualOut(wrapXi(i + 1), j) = residualOut(wrapXi(i + 1), j) + flux;
+        }
+    }
 
+    // 2. Get pure inviscid residual along Eta direction (j+1/2 faces)
+    for (int j = 0; j < ny - 1; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            StateVec UL = reconstructEta(state_in, i, j, false);
+            StateVec UR = reconstructEta(state_in, i, j, true);
+            StateVec flux = RoeFlux::computeFlux(UL, UR, NormalsEta(i, j));
 
-    // 1. Get pure inviscid residual along Eta direction (j+1/2 faces)
-
+            residualOut(i, j) = residualOut(i, j) - flux;
+            residualOut(i, j + 1) = residualOut(i, j + 1) + flux;
+        }
+    }
 
     // 3. Viscous Fluxes along Xi direction (i+1/2 faces)
     for (int j = 0; j < ny; ++j) {
         for (int i = 0; i < nx; ++i) {
+            int i_next = wrapXi(i + 1);
+            int ni = (i + 1 < Nodes.nx) ? i + 1 : 0;
 
+            Point2D c_curr = getCellPos(i, j);
+            Point2D c_next = getCellPos(i_next, j);
+            Point2D n_bottom = Nodes(ni, j);
+            Point2D n_top = Nodes(ni, j + 1);
+
+            // Contour integral differences
+            double d_ix = c_next.x - c_curr.x;
+            double d_iy = c_next.y - c_curr.y;
+            double d_jx = n_top.x - n_bottom.x;
+            double d_jy = n_top.y - n_bottom.y;
+            double area = d_ix * d_jy - d_jx * d_iy;
+
+            StateVec U_curr = state_in(i, j);
+            StateVec U_next = state_in(i_next, j);
+            StateVec U_bottom = interpolateToNode(state_in, ni, j);
+            StateVec U_top = interpolateToNode(state_in, ni, j + 1);
+
+            // Green-Gauss Gradient Lambda
+            auto calcGrad = [&](double phi_curr, double phi_next, double phi_bottom, double phi_top) {
+                double d_i_phi = phi_next - phi_curr;
+                double d_j_phi = phi_top - phi_bottom;
+                Gradient2D g;
+                g.dx = (d_i_phi * d_jy - d_j_phi * d_iy) / area;
+                g.dy = (d_j_phi * d_ix - d_i_phi * d_jx) / area;
+                return g;
+                };
+
+            Gradient2D g_u = calcGrad(U_curr.u(), U_next.u(), U_bottom.u(), U_top.u());
+            Gradient2D g_v = calcGrad(U_curr.v(), U_next.v(), U_bottom.v(), U_top.v());
+            Gradient2D g_T = calcGrad(U_curr.T(), U_next.T(), U_bottom.T(), U_top.T());
+
+            StateVec U_face = (U_curr + U_next) * 0.5; // Average state at face
+            double mu_face = computeViscosity(U_face.T());
+            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, NormalsXi(i, j), mu_face);
+
+            // Viscous fluxes have the opposite sign mapping compared to inviscid fluxes
+            residualOut(i, j) = residualOut(i, j) + visc_flux;
+            residualOut(i_next, j) = residualOut(i_next, j) - visc_flux;
         }
     }
 
     // 4. Viscous Fluxes along Eta direction (j+1/2 faces)
     for (int j = 0; j < ny - 1; ++j) {
         for (int i = 0; i < nx; ++i) {
+            int i_right = (i + 1 < Nodes.nx) ? i + 1 : 0;
 
+            Point2D c_curr = getCellPos(i, j);
+            Point2D c_next = getCellPos(i, j + 1);
+            Point2D n_left = Nodes(i, j + 1);
+            Point2D n_right = Nodes(i_right, j + 1);
+
+            double d_ix = n_right.x - n_left.x;
+            double d_iy = n_right.y - n_left.y;
+            double d_jx = c_next.x - c_curr.x;
+            double d_jy = c_next.y - c_curr.y;
+            double area = d_ix * d_jy - d_jx * d_iy;
+
+            StateVec U_curr = state_in(i, j);
+            StateVec U_next = state_in(i, j + 1);
+            StateVec U_left = interpolateToNode(state_in, i, j + 1);
+            StateVec U_right = interpolateToNode(state_in, i_right, j + 1);
+
+            auto calcGrad = [&](double phi_curr, double phi_next, double phi_left, double phi_right) {
+                double d_i_phi = phi_right - phi_left;
+                double d_j_phi = phi_next - phi_curr;
+                Gradient2D g;
+                g.dx = (d_i_phi * d_jy - d_j_phi * d_iy) / area;
+                g.dy = (d_j_phi * d_ix - d_i_phi * d_jx) / area;
+                return g;
+                };
+
+            Gradient2D g_u = calcGrad(U_curr.u(), U_next.u(), U_left.u(), U_right.u());
+            Gradient2D g_v = calcGrad(U_curr.v(), U_next.v(), U_left.v(), U_right.v());
+            Gradient2D g_T = calcGrad(U_curr.T(), U_next.T(), U_left.T(), U_right.T());
+
+            StateVec U_face = (U_curr + U_next) * 0.5;
+            double mu_face = computeViscosity(U_face.T());
+            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, NormalsEta(i, j), mu_face);
+
+            residualOut(i, j) = residualOut(i, j) + visc_flux;
+            residualOut(i, j + 1) = residualOut(i, j + 1) - visc_flux;
         }
     }
 
-    // 5. Viscous Wall boundary condition (at j=0)
+    // 5. Viscous Wall boundary condition (at j=1/2)
     for (int i = 0; i < nx; ++i) {
+        int i_right = (i + 1 < Nodes.nx) ? i + 1 : 0;
 
+        Point2D c_curr = getCellPos(i, 0);
+        Point2D n_left = Nodes(i, 0);
+        Point2D n_right = Nodes(i_right, 0);
+        Point2D face_center((n_left.x + n_right.x) * 0.5, (n_left.y + n_right.y) * 0.5);
+
+        double d_ix = n_right.x - n_left.x;
+        double d_iy = n_right.y - n_left.y;
+        double d_jx = c_curr.x - face_center.x; // Delta j mapped from wall center to cell center
+        double d_jy = c_curr.y - face_center.y;
+        double area = d_ix * d_jy - d_jx * d_iy;
+
+        StateVec U_curr = state_in(i, 0);
+        StateVec U_wall = extrapolateToWall(state_in, i);
+        StateVec U_left = interpolateToNode(state_in, i, 0);
+        StateVec U_right = interpolateToNode(state_in, i_right, 0);
+
+   
+
+        auto calcGrad = [&](double phi_curr, double phi_wall, double phi_left, double phi_right) {
+            double d_i_phi = phi_right - phi_left;
+            double d_j_phi = phi_curr - phi_wall;
+            Gradient2D g;
+            g.dx = (d_i_phi * d_jy - d_j_phi * d_iy) / area;
+            g.dy = (d_j_phi * d_ix - d_i_phi * d_jx) / area;
+            return g;
+            };
+
+        Gradient2D g_u = calcGrad(U_curr.u(), U_wall.u(), U_left.u(), U_right.u());
+        Gradient2D g_v = calcGrad(U_curr.v(), U_wall.v(), U_left.v(), U_right.v());
+        Gradient2D g_T = calcGrad(U_curr.T(), U_wall.T(), U_left.T(), U_right.T());
+
+        double mu_wall = computeViscosity(U_wall.T());
+
+        // ComputeCompleteNSWallFlux returns: (wall_inviscid_flux - wall_viscous_flux)
+        StateVec wall_flux = BoundaryConditions::computeCompleteNSWallFlux(U_wall, g_u, g_v, g_T, WallNormals[i], mu_wall);
+        residualOut(i, 0) = residualOut(i, 0) + wall_flux; // Add combined physical flux inward to cell
     }
 
     // 6. Apply Far-field Boundary Fluxes (Direct flux subtraction)
     for (int i = 0; i < nx; ++i) {
-
+        StateVec U_star = extrapolateToFarfield(state_in, i);
+        StateVec far_flux = BoundaryConditions::computeFarFieldFlux(U_star, U_inf, FarfieldNormals[i]);
+        residualOut(i, ny - 1) = residualOut(i, ny - 1) - far_flux;
     }
-
 }

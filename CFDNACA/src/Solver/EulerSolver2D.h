@@ -30,9 +30,11 @@ public:
 private:
     double minmod(double a, double b) const;
     StateVec minmod(const StateVec& a, const StateVec& b) const;
+
+protected:
     StateVec reconstructXi(const Field2D<StateVec>& state_in, int i, int j, bool isRight) const;
     StateVec reconstructEta(const Field2D<StateVec>& state_in, int i, int j, bool isRight) const;
-    StateVec extrapolateToWall(const Field2D<StateVec>& state_in, int i) const;
+    virtual StateVec extrapolateToWall(const Field2D<StateVec>& state_in, int i) const;
     StateVec extrapolateToFarfield(const Field2D<StateVec>& state_in, int i) const;
     
 };
