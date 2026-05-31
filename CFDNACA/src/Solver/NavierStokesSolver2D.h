@@ -14,10 +14,12 @@ public:
     double computeTimeStep() override;
     void computeFluxResidual(const Field2D<StateVec>& state_in, Field2D<StateVec>& residualOut) const override;
 
-private:
 
+    
+private:
     // Helper to compute local dynamic viscosity based on scaling parameters
     double computeViscosity(double T) const;
+
 
     // Geometric and Interpolation Helpers
     Point2D getCellPos(int i, int j) const;

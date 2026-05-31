@@ -80,7 +80,7 @@ StateVec BoundaryConditions::computeFarFieldFlux(const StateVec& U_star, const S
     return far_flux;
 }
 
-StateVec BoundaryConditions::computeViscousWallFlux(
+StateVec BoundaryConditions::computeCompleteNSWallFlux(
     const StateVec& U_wall,
     const Gradient2D& grad_u,
     const Gradient2D& grad_v,
@@ -108,7 +108,14 @@ StateVec BoundaryConditions::computeViscousWallFlux(
     wall_visc_flux.rho = 0.0;
     wall_visc_flux.rhou = (tau_xx * nx + tau_xy * ny) * ds;
     wall_visc_flux.rhov = (tau_xy * nx + tau_yy * ny) * ds;
-    wall_visc_flux.rhoE = 0.0;
+    wall_visc_flux.rhoE =((k * grad_T.dx ) * nx + ( k * grad_T.dy) * ny) * ds;
 
-    return wall_visc_flux;
+    StateVec wall_invisid_flux;
+    wall_invisid_flux.rho = 0.0;
+    wall_invisid_flux.rhou = U_wall.p() * nx * ds;
+    wall_invisid_flux.rhov = U_wall.p() * ny * ds;
+    wall_invisid_flux.rhoE = 0.0;
+       
+
+    return wall_invisid_flux- wall_visc_flux;
 }

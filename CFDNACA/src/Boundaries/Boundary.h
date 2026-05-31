@@ -8,7 +8,7 @@ public:
     static StateVec computeFarFieldFlux(const StateVec& U_star, const StateVec& U_inf, const FaceNormal& outward_normal);
 
     // Viscous N-S Wall Boundary
-    static StateVec computeViscousWallFlux(
+    static StateVec computeCompleteNSWallFlux(
         const StateVec& U_wall,
         const Gradient2D& grad_u,
         const Gradient2D& grad_v,

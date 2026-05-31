@@ -34,6 +34,10 @@ int main() {
     // 2. Initialize Solver & Time Integrator
     // ---------------------------------------------------------
 
+	
+
+   
+
     Field2D<Point2D> nodes(Nx, Ny);
     try {
         // Read the nodes BEFORE passing them to the N-S solver
@@ -43,9 +47,10 @@ int main() {
         std::cerr << "Failed to read nodes: " << e.what() << "\n";
         return 1;
     }
-
+   
     EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL);
     //NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
+  
     RungeKutta3 rk3(nx, ny);
 
    

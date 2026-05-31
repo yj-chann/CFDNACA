@@ -23,8 +23,8 @@ namespace Config {
     constexpr double alpha_deg = 1.25;
     constexpr double alpha_rad = alpha_deg * M_PI / 180.0;
 
-    constexpr double rho_inf = 1.0;
-    constexpr double p_inf = 1.0;
+    constexpr double rho_inf = 1.225;
+    constexpr double p_inf = 101325;
 
     // ---------------------------------------------------------
     // Viscous & Reference Parameters
@@ -36,6 +36,6 @@ namespace Config {
     // ---------------------------------------------------------
     // Solver Control Parameters
     // ---------------------------------------------------------
-    constexpr double maxCFL = 0.8;
-    constexpr int spatialOrder = 2;
+    constexpr double maxCFL = 0.5;
+    constexpr int spatialOrder = 0;
 }
