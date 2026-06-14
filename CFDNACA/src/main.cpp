@@ -46,11 +46,10 @@ int main() {
         return 1;
     }
    
-    //std::cout << nodes.nx;
 
 
-    EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL, nodes);
-    //NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
+    //EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL, nodes);
+    NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
   
     RungeKutta3 rk3(nx, ny);
 

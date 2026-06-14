@@ -78,8 +78,13 @@ StateVec NavierStokesSolver2D::interpolateToNode(const Field2D<StateVec>& U_in, 
 
     // 2. Boundary mapped node interpolation
     if (nj == 0) { // Solid Wall No-slip Isothermal Boundary mapping
-        // Horizontally interpolate pressure and density for the first two cell rows above the wall
-        double p_node = alpha * U_in(ci_L, 0).p() + (1.0 - alpha) * U_in(ci_R, 0).p();
+        double p_row0 = alpha * U_in(ci_L, 0).p() + (1.0 - alpha) * U_in(ci_R, 0).p();
+        double p_node = p_row0;
+
+        if (spatialOrder) {
+            double p_row1 = alpha * U_in(ci_L, 1).p() + (1.0 - alpha) * U_in(ci_R, 1).p();
+            p_node = p_row0 * 1.5 - p_row1 * 0.5;
+        }
 
         // isothermal rho_node = p_node / (R * T_wall)
         double rho_node = p_node / (Config::R * Config::Tw);
@@ -230,7 +235,7 @@ double NavierStokesSolver2D::computeTimeStep() {
 }
 
 void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in, Field2D<StateVec>& residualOut) const {
-    // 0. Zero out the residual array
+    // 0. Zero out the residual array (cellcenter based)
     for (int j = 0; j < ny; ++j) {
         for (int i = 0; i < nx; ++i) {
             residualOut(i, j) = StateVec();
@@ -266,18 +271,17 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
     for (int j = 0; j < ny; ++j) {
         for (int i = 0; i < nx; ++i) {
             int i_next = wrapXi(i + 1);
-            int ni = (i + 1 < Nodes.nx) ? i + 1 : 0;
+            int ni = i + 1;
 
             Point2D c_curr = getCellPos(i, j);
             Point2D c_next = getCellPos(i_next, j);
-            Point2D n_bottom = Nodes(ni, j);
-            Point2D n_top = Nodes(ni, j + 1);
+            const FaceNormal& xiNormal = NormalsXi(i, j);
 
             // Contour integral differences
             double d_ix = c_next.x - c_curr.x;
             double d_iy = c_next.y - c_curr.y;
-            double d_jx = n_top.x - n_bottom.x;
-            double d_jy = n_top.y - n_bottom.y;
+            double d_jx = -xiNormal.ny * xiNormal.length;
+            double d_jy = xiNormal.nx * xiNormal.length;
             double area = d_ix * d_jy - d_jx * d_iy;
 
             StateVec U_curr = state_in(i, j);
@@ -301,7 +305,7 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
 
             StateVec U_face = (U_curr + U_next) * 0.5; // Average state at face
             double mu_face = computeViscosity(U_face.T());
-            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, NormalsXi(i, j), mu_face);
+            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, xiNormal, mu_face);
 
             // Viscous fluxes have the opposite sign mapping compared to inviscid fluxes
             residualOut(i, j) = residualOut(i, j) + visc_flux;
@@ -316,11 +320,10 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
 
             Point2D c_curr = getCellPos(i, j);
             Point2D c_next = getCellPos(i, j + 1);
-            Point2D n_left = Nodes(i, j + 1);
-            Point2D n_right = Nodes(i_right, j + 1);
+            const FaceNormal& etaNormal = NormalsEta(i, j);
 
-            double d_ix = n_right.x - n_left.x;
-            double d_iy = n_right.y - n_left.y;
+            double d_ix = etaNormal.ny * etaNormal.length;
+            double d_iy = -etaNormal.nx * etaNormal.length;
             double d_jx = c_next.x - c_curr.x;
             double d_jy = c_next.y - c_curr.y;
             double area = d_ix * d_jy - d_jx * d_iy;
@@ -345,7 +348,7 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
 
             StateVec U_face = (U_curr + U_next) * 0.5;
             double mu_face = computeViscosity(U_face.T());
-            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, NormalsEta(i, j), mu_face);
+            StateVec visc_flux = ViscousFlux::computeFlux(U_face, g_u, g_v, g_T, etaNormal, mu_face);
 
             residualOut(i, j) = residualOut(i, j) + visc_flux;
             residualOut(i, j + 1) = residualOut(i, j + 1) - visc_flux;
@@ -354,7 +357,7 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
 
     // 5. Viscous Wall boundary condition (at j=1/2)
     for (int i = 0; i < nx; ++i) {
-        int i_right = (i + 1 < Nodes.nx) ? i + 1 : 0;
+        int i_right = i + 1;
 
         Point2D c_curr = getCellPos(i, 0);
         Point2D n_left = Nodes(i, 0);
