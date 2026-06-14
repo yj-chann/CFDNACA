@@ -5,9 +5,6 @@
 
 class NavierStokesSolver2D : public EulerSolver2D {
 public:
-    // Raw nodal coordinates required for accurate Green-Gauss contour integrals
-    Field2D<Point2D> Nodes;
-
     NavierStokesSolver2D(int num_cells_x, int num_cells_y, int order, double cfl, const Field2D<Point2D>& meshNodes);
 
     // Overridden methods to apply viscous N-S physics

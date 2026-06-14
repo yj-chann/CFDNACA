@@ -3,10 +3,10 @@
 #include "../Boundaries/Boundary.h"
 #include <algorithm>
 
-EulerSolver2D::EulerSolver2D(int num_cells_x, int num_cells_y, int order, double cfl)
+EulerSolver2D::EulerSolver2D(int num_cells_x, int num_cells_y, int order, double cfl, const Field2D<Point2D>& meshNodes)
     : nx(num_cells_x), ny(num_cells_y), spatialOrder(order), maxCFL(cfl),
     U(nx, ny), Volumes(nx, ny), NormalsXi(nx, ny), NormalsEta(nx, ny),
-    WallNormals(nx), FarfieldNormals(nx) {
+    WallNormals(nx), FarfieldNormals(nx), Nodes(meshNodes) {
 }
 
 void EulerSolver2D::initialize(double rho_inf, double u_inf, double v_inf, double p_inf) {

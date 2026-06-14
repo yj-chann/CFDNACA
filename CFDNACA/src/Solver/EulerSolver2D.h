@@ -4,21 +4,21 @@
 
 class EulerSolver2D {
 public:
-    int nx, ny;
+    int nx, ny; // cell center
     int spatialOrder; // 0 = Constant, 1 = 1st-Order Unlimited, 2 = TVD Minmod
     double maxCFL;
     StateVec U_inf;
 
     Field2D<StateVec> U;
     Field2D<double> Volumes;
-
+    const Field2D<Point2D>& Nodes;
     Field2D<FaceNormal> NormalsXi;
     Field2D<FaceNormal> NormalsEta;
     std::vector<FaceNormal> WallNormals;
     std::vector<FaceNormal> FarfieldNormals;
 
 
-    EulerSolver2D(int num_cells_x, int num_cells_y, int order, double cfl);
+    EulerSolver2D(int num_cells_x, int num_cells_y, int order, double cfl, const Field2D<Point2D>& meshNodes);
     virtual ~EulerSolver2D() = default;
 
     void initialize(double rho_inf, double u_inf, double v_inf, double p_inf);

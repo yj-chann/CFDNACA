@@ -6,8 +6,7 @@
 #include <cmath>
 
 NavierStokesSolver2D::NavierStokesSolver2D(int num_cells_x, int num_cells_y, int order, double cfl, const Field2D<Point2D>& meshNodes)
-    : EulerSolver2D(num_cells_x, num_cells_y, order, cfl),
-    Nodes(meshNodes) {
+    : EulerSolver2D(num_cells_x, num_cells_y, order, cfl , meshNodes){
 }
 
 
@@ -25,18 +24,20 @@ double NavierStokesSolver2D::computeViscosity(double T) const {
     return mu;
 }
 
-// i + 1/2, 1/2
+// i , 1/2
 StateVec NavierStokesSolver2D::extrapolateToWall(const Field2D<StateVec>& state_in, int i) const {
     if (!spatialOrder) {
-        double p_node = state_in(i, 0).p();
-        // isothermal rho_node = p_node / (R * T_wall)
-        double rho_node = p_node / (Config::R * Config::Tw);
-        return StateVec(rho_node, 0.0, 0.0, p_node / Config::GAMMA_MINUS_ONE);
+        double p = state_in(i, 0).p();
+        // isothermal rho = p / (R * T_wall)
+        double rho = p / (Config::R * Config::Tw);
+        double rhoE = p / Config::GAMMA_MINUS_ONE;
+        return StateVec(rho, 0.0, 0.0, rhoE);
     }
     else{
-        double p_node = (state_in(i, 0).p() * 1.5 - state_in(i, 1).p() * 0.5);
-        double rho_node = p_node / (Config::R * Config::Tw);
-        return StateVec(rho_node, 0.0, 0.0, p_node / Config::GAMMA_MINUS_ONE);
+        double p = (state_in(i, 0).p() * 1.5 - state_in(i, 1).p() * 0.5);
+        double rho = p / (Config::R * Config::Tw);
+        double rhoE = p / Config::GAMMA_MINUS_ONE;
+        return StateVec(rho, 0.0, 0.0, rhoE);
     }
 }
 
@@ -46,7 +47,7 @@ StateVec NavierStokesSolver2D::extrapolateToWall(const Field2D<StateVec>& state_
 Point2D NavierStokesSolver2D::getCellPos(int i, int j) const {
     // Averages the 4 surrounding nodes to find the cell center coordinate
     int ni = i;
-    int nip1 = (i + 1 < Nodes.nx) ? i + 1 : 0; // Node index wrapping 
+    int nip1 = i + 1;
     int nj = j;
     int njp1 = j + 1;
 
@@ -57,50 +58,98 @@ Point2D NavierStokesSolver2D::getCellPos(int i, int j) const {
 
 
 // ni , nj are node indices (0 to nx for ni, 0 to ny for nj) - note that nodes are (nx+1) x (ny+1)
+// i+1/2,j+1/2
 StateVec NavierStokesSolver2D::interpolateToNode(const Field2D<StateVec>& U_in, int ni, int nj) const {
     // 1. Calculate horizontal weighting factor (alpha) - needed for both boundary and interior
     int ci_L = wrapXi(ni - 1);
     int ci_R = wrapXi(ni);
 
  
-    int ni_L = wrapXi(ni - 1);
-    int ni_R = wrapXi(ni + 1);
+    int ni_L = (ni - 1) == -1 ? nx - 1 : ni-1;
+    int ni_R = (ni + 1) == nx + 1 ? 1 : ni+1;
+
     Point2D p_L = Nodes(ni_L, nj);
     Point2D p_R = Nodes(ni_R, nj);
     Point2D p_node = Nodes(ni, nj);
 
     double d_L = std::hypot(p_L.x - p_node.x, p_L.y - p_node.y);
     double d_R = std::hypot(p_R.x - p_node.x, p_R.y - p_node.y);
-    double alpha = d_R / (d_L + d_R + 1e-14); // Avoid div by zero
+    double alpha = d_R / (d_L + d_R);
 
     // 2. Boundary mapped node interpolation
     if (nj == 0) { // Solid Wall No-slip Isothermal Boundary mapping
         // Horizontally interpolate pressure and density for the first two cell rows above the wall
-        double p_row0 = alpha * U_in(ci_L, 0).p() + (1.0 - alpha) * U_in(ci_R, 0).p();
-        double p_row1 = alpha * U_in(ci_L, 1).p() + (1.0 - alpha) * U_in(ci_R, 1).p();
+        double p_node = alpha * U_in(ci_L, 0).p() + (1.0 - alpha) * U_in(ci_R, 0).p();
+
+        // isothermal rho_node = p_node / (R * T_wall)
+        double rho_node = p_node / (Config::R * Config::Tw);
+
+        // Reconstruct and return conservative StateVec   
+        double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
+        return StateVec(rho_node, 0.0, 0.0, rhoE_node);
 
 
-        // Apply Boundary Conditions
-        if (!spatialOrder) {
-            
-            double p_node =  p_row0 ;
-
-            // isothermal rho_node = p_node / (R * T_wall)
-            double rho_node = p_node / (Config::R * Config::Tw);
-
-            // Reconstruct and return conservative StateVec   
-            double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
-            return StateVec(rho_node, 0.0, 0.0, rhoE_node);
-        }
-        else { 
-            double p_node = 1.5 * p_row0 - 0.5 * p_row1; // Extrapolated pressure       
-            double rho_node = p_node / (Config::R * Config::Tw);  
-            double rhoE_node = p_node / Config::GAMMA_MINUS_ONE;
-            return StateVec(rho_node, 0.0, 0.0, rhoE_node);
-        }
     }
 
-    if (nj >= ny) return U_inf; // Simplistic Far-field mapping
+    if (nj >= ny) { // Far-field Characteristic Boundary Mapping
+        // Horizontally interpolate U for the last two cell rows below the far-field
+        StateVec U_row_ny1 = U_in(ci_L, ny - 1) * alpha + U_in(ci_R, ny - 1) * (1.0 - alpha);
+        StateVec U_row_ny2 = U_in(ci_L, ny - 2) * alpha + U_in(ci_R, ny - 2) * (1.0 - alpha);
+
+        StateVec U_star;
+        if (!spatialOrder) {
+            U_star = U_row_ny1;
+        }
+        else {
+            U_star = U_row_ny1 * 1.5 - U_row_ny2 * 0.5;
+        }
+
+        FaceNormal n_L = FarfieldNormals[ci_L];
+        FaceNormal n_R = FarfieldNormals[ci_R];
+        double n_x = alpha * n_L.nx + (1.0 - alpha) * n_R.nx;
+        double n_y = alpha * n_L.ny + (1.0 - alpha) * n_R.ny;
+        double n_len = std::hypot(n_x, n_y);
+        n_x /= (n_len);
+        n_y /= (n_len);
+
+        double Vn_inf = U_inf.u() * n_x + U_inf.v() * n_y;
+        double a_inf = U_inf.a();
+        double Vn_star = U_star.u() * n_x + U_star.v() * n_y;
+        double a_star = U_star.a();
+
+        double R1, R2, R3, R4;
+
+        // lambda 1
+        if (Vn_inf - a_inf < 0) { R1 = Vn_inf - 2.0 * a_inf / Config::GAMMA_MINUS_ONE; }
+        else { R1 = Vn_star - 2.0 * a_star / Config::GAMMA_MINUS_ONE; }
+
+        // lambda 2 (Entropy)
+        if (Vn_inf < 0) { R2 = U_inf.p() / std::pow(U_inf.rho, Config::GAMMA); }
+        else { R2 = U_star.p() / std::pow(U_star.rho, Config::GAMMA); }
+
+        // lambda 3 (Tangential Velocity)
+        if (Vn_inf < 0) { R3 = U_inf.v() * n_x - U_inf.u() * n_y; } // Vt_inf
+        else { R3 = U_star.v() * n_x - U_star.u() * n_y; } // Vt_star
+
+        // lambda 4
+        if (Vn_inf + a_inf < 0) { R4 = Vn_inf + 2.0 * a_inf / Config::GAMMA_MINUS_ONE; }
+        else { R4 = Vn_star + 2.0 * a_star / Config::GAMMA_MINUS_ONE; }
+
+        // Solve for boundary primitives from R1, R2, R3, R4
+        double Vn_b = 0.5 * (R1 + R4);
+        double a_b = 0.25 * Config::GAMMA_MINUS_ONE * (R4 - R1);
+        double Vt_b = R3;
+
+        double rho_b = std::pow((a_b * a_b) / (Config::GAMMA * R2), 1.0 / Config::GAMMA_MINUS_ONE);
+        double p_b = rho_b * (a_b * a_b) / Config::GAMMA;
+
+        double u_b = Vn_b * n_x - Vt_b * n_y;
+        double v_b = Vn_b * n_y + Vt_b * n_x;
+
+        double rhoE_b = p_b / Config::GAMMA_MINUS_ONE + 0.5 * rho_b * (u_b * u_b + v_b * v_b);
+
+        return StateVec(rho_b, rho_b * u_b, rho_b * v_b, rhoE_b);
+    }
 
     // 3. Interior Node Interpolation (nj > 0 && nj < ny)
     int cj_B = nj - 1;
@@ -111,7 +160,7 @@ StateVec NavierStokesSolver2D::interpolateToNode(const Field2D<StateVec>& U_in, 
     Point2D p_T = Nodes(ni, nj + 1);
     double d_B = std::hypot(p_B.x - p_node.x, p_B.y - p_node.y);
     double d_T = std::hypot(p_T.x - p_node.x, p_T.y - p_node.y);
-    double beta = d_T / (d_B + d_T + 1e-14);
+    double beta = d_T / (d_B + d_T);
 
     StateVec U_LB = U_in(ci_L, cj_B);
     StateVec U_RB = U_in(ci_R, cj_B);
@@ -150,7 +199,7 @@ double NavierStokesSolver2D::computeTimeStep() {
 
             // Fetch nodes for geometric metrics differences
             int ni = i;
-            int nip1 = (i + 1 < Nodes.nx) ? i + 1 : 0;
+            int nip1 = i + 1;
 
             double dy_xi = Nodes(nip1, j).y - Nodes(ni, j).y;
             double dy_eta = Nodes(ni, j + 1).y - Nodes(ni, j).y;
@@ -188,7 +237,7 @@ void NavierStokesSolver2D::computeFluxResidual(const Field2D<StateVec>& state_in
         }
     }
 
-    // 1. Get pure inviscid residual along Xi direction (i+1/2 faces)
+	// 1. Get pure inviscid residual along Xi direction (i+1/2 faces)
     for (int j = 0; j < ny; ++j) {
         for (int i = 0; i < nx; ++i) {
             StateVec UL = reconstructXi(state_in, i, j, false);

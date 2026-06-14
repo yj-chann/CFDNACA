@@ -12,9 +12,7 @@
 #include "Solver/NavierStokesSolver2D.h"
 #include "TimeIntegration/RungeKutta3.h"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+
 
 int main() {
     // ---------------------------------------------------------
@@ -48,8 +46,11 @@ int main() {
         return 1;
     }
    
-    //EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL);
-    NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
+    //std::cout << nodes.nx;
+
+
+    EulerSolver2D solver(nx, ny, Config::spatialOrder,Config::maxCFL, nodes);
+    //NavierStokesSolver2D solver(nx, ny, Config::spatialOrder, Config::maxCFL, nodes);
   
     RungeKutta3 rk3(nx, ny);
 
@@ -83,7 +84,7 @@ int main() {
     const int output_interval = 100;
     const double convergence_tolerance = 1e-8;
 
-    std::cout << "\nStarting Euler Solver Iterations...\n";
+    std::cout << "\nStarting Solver Iterations...\n";
     std::cout << std::setw(10) << "Iter"
         << std::setw(20) << "L2_Residual_Rho" << "\n";
     std::cout << std::string(30, '-') << "\n";
